@@ -1,0 +1,17 @@
+hexdump 3.3
+===========
+
+Author: anatoly techtonik <techtonik@gmail.com>
+Homepage: https://bitbucket.org/techtonik/hexdump/
+
+The package metadata and the upstream README state:
+
+License
+=======
+Public Domain
+
+Credits
+=======
+anatoly techtonik <techtonik@gmail.com>
+George Schizas
+Ian Land
