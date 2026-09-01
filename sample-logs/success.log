@@ -1,3 +1,3 @@
-2026-08-28 12:00:00 INFO ps2ripper.core.logging: PS2 OPL Ripper 0.1.1 Beta started on Windows 10.0.26100
+2026-09-01 12:00:00 INFO ps2ripper.core.logging: PS2 OPL Ripper 0.1.2 Beta started on Windows 10.0.26100
 2026-08-28 12:00:03 INFO ps2ripper.ui.main_window: Selected PhysicalDrive3 model=Portable SSD serial=sha256:0123456789abcdef capacity=256060514304
 2026-08-28 12:05:12 INFO ps2ripper.core.workflow: Installed SCUS_973.28 as E:\DVD\SCUS_973.28.God of War.iso; size=4699979776 sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef retries=0 elapsed=308.6s

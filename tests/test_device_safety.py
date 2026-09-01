@@ -44,6 +44,24 @@ def test_gpt_is_not_compatible():
     assert "not MBR" in reasons[0]
 
 
+def test_exfat_volume_without_mount_point_is_not_ready():
+    compatible, reasons = validate_opl_compatibility(
+        compatible_disk(
+            volumes=(
+                VolumeInfo(
+                    "\\\\?\\Volume{test}\\",
+                    (),
+                    "exFAT",
+                    writable=True,
+                    disk_numbers=(3,),
+                ),
+            )
+        )
+    )
+    assert not compatible
+    assert "no accessible mount point" in reasons[0]
+
+
 def test_identity_change_is_rejected():
     selected = compatible_disk(serial="one")
     current = compatible_disk(serial="two")

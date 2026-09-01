@@ -7,7 +7,7 @@ runtime notice list.
 
 | Component | Version | License used by this distribution |
 | --- | --- | --- |
-| PS2 OPL Ripper | 0.1.1 Beta | GPL-3.0-or-later |
+| PS2 OPL Ripper | 0.1.2 Beta | GPL-3.0-or-later |
 | FATtools | 1.1.23 | GPL-3.0 |
 | Qt for Python: PySide6, Essentials, Addons, shiboken6, and Qt | 6.11.2 | LGPL-3.0-only option |
 | pycdlib | 1.20.0 | LGPL-2.1-only |

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ps2ripper"
-version = "0.1.1b1"
+version = "0.1.2b1"
 description = "Self-contained Windows PS2 disc ripper and OPL USB drive manager"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"

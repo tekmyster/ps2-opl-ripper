@@ -433,6 +433,8 @@ def validate_opl_compatibility(disk: PhysicalDisk) -> tuple[bool, tuple[str, ...
         reasons.append(f"Expected one mounted volume; found {len(disk.volumes)}.")
     elif (disk.volumes[0].filesystem or "").casefold() != "exfat":
         reasons.append(f"Filesystem is {disk.volumes[0].filesystem or 'unknown'}, not exFAT.")
+    elif not disk.volumes[0].mount_points:
+        reasons.append("The exFAT volume has no accessible mount point.")
     elif not disk.volumes[0].writable:
         reasons.append("The exFAT volume is read-only or inaccessible.")
     return not reasons, tuple(reasons)

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-  <assemblyIdentity version="0.1.1.0" processorArchitecture="amd64" name="PS2OPLRipper" type="win32"/>
+  <assemblyIdentity version="0.1.2.0" processorArchitecture="amd64" name="PS2OPLRipper" type="win32"/>
   <description>PS2 OPL Ripper and USB Drive Manager</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>

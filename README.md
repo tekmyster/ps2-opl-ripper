@@ -5,7 +5,7 @@ HDD/SSD for Open PS2 Loader (OPL), creates personal backup images from owned
 PlayStation 2 discs, validates them, copies them into the correct `DVD` or `CD`
 folder, and verifies the destination with SHA-256.
 
-Current release: **0.1.1 Beta**. The packaged runtime is one file:
+Current release: **0.1.2 Beta**. The packaged runtime is one file:
 `PS2OPLRipper.exe`. It does not invoke
 PowerShell, WMIC, diskpart, format.com, ImgBurn, 7-Zip, Java, WSL, or a separate
 Python installation. Windows APIs are called directly with `ctypes`.
@@ -51,6 +51,12 @@ Logs are written to:
 
 Full storage serial numbers are used in memory for identity verification but
 are stored in logs only as a short SHA-256 fingerprint.
+
+When an existing writable MBR/exFAT USB drive is detected, the destination
+section displays **PS2 READY DRIVE DETECTED**. Select **Use Existing PS2 Drive**
+to preserve its games and create only missing OPL folders. Reformatting is an
+optional checkbox that is off by default, clears whenever drive selection
+changes, and still requires the physical-drive typed confirmation.
 
 ## Build from source
 

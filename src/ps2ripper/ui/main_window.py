@@ -6,6 +6,7 @@ from pathlib import Path
 from PySide6.QtCore import QSettings, Qt, QThreadPool, QTimer
 from PySide6.QtGui import QAction, QCloseEvent
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QFormLayout,
@@ -79,6 +80,25 @@ class MainWindow(QMainWindow):
         row.addWidget(self.disk_combo, 1)
         row.addWidget(self.refresh_disks_button)
         destination_layout.addLayout(row)
+        self.ready_drive_banner = QLabel("<b>PS2 READY DRIVE DETECTED</b>")
+        self.ready_drive_banner.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.ready_drive_banner.setStyleSheet(
+            "QLabel { color: #146c2e; background: #e7f5eb; border: 1px solid #6fa77c; "
+            "padding: 7px; }"
+        )
+        self.ready_drive_banner.setVisible(False)
+        destination_layout.addWidget(self.ready_drive_banner)
+        self.reformat_checkbox = QCheckBox(
+            "Reformat selected drive before use (ERASES ALL DATA)"
+        )
+        self.reformat_checkbox.setAccessibleName("Reformat selected USB drive")
+        self.reformat_checkbox.setStyleSheet(
+            "QCheckBox:checked { color: #a40000; font-weight: bold; }"
+        )
+        self.reformat_checkbox.setChecked(False)
+        self.reformat_checkbox.setEnabled(False)
+        self.reformat_checkbox.toggled.connect(self._update_drive_action)
+        destination_layout.addWidget(self.reformat_checkbox)
         self.disk_details = QLabel("No USB storage devices inspected yet.")
         self.disk_details.setWordWrap(True)
         self.disk_details.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -165,8 +185,9 @@ class MainWindow(QMainWindow):
             self,
             "Welcome to PS2 OPL Ripper",
             "This program prepares a USB drive for Open PS2 Loader and creates backup images "
-            "of PlayStation 2 discs you own.\n\nInitializing an incompatible USB drive erases it. "
-            "No drive is ever selected or erased automatically.",
+            "of PlayStation 2 discs you own.\n\nExisting PS2-ready drives are detected and reused "
+            "without formatting. Reformat is never selected automatically and always requires "
+            "the full typed confirmation.",
         )
         self.refresh_disks()
 
@@ -196,7 +217,7 @@ class MainWindow(QMainWindow):
 
     def _refresh_controls(self) -> None:
         self.refresh_disks_button.setEnabled(not self.busy)
-        self.prepare_button.setEnabled(not self.busy and self.disk_combo.currentIndex() >= 0)
+        self._update_drive_action()
         self.refresh_optical_button.setEnabled(not self.busy and self.opl_root is not None)
         self.scan_disc_button.setEnabled(
             not self.busy and self.opl_root is not None and self.optical_combo.currentIndex() >= 0
@@ -218,6 +239,9 @@ class MainWindow(QMainWindow):
         self.opl_root = None
         self.selected_disk = None
         self.disc = None
+        self.ready_drive_banner.setVisible(False)
+        self.reformat_checkbox.setChecked(False)
+        self.reformat_checkbox.setEnabled(False)
         self.disk_combo.clear()
         self.disk_details.setText("Inspecting USB storage devices…")
         self._set_optical_enabled(False)
@@ -238,15 +262,20 @@ class MainWindow(QMainWindow):
                 [point for volume in disk.volumes for point in volume.mount_points],
                 list(disk.safety_reasons),
             )
+        self.disk_combo.blockSignals(True)
         self.disk_combo.clear()
         for disk in disks:
             mounts = (
                 ", ".join(point for volume in disk.volumes for point in volume.mount_points)
                 or "No drive letter"
             )
+            compatible, _reasons = validate_opl_compatibility(disk)
+            prefix = "PS2 Ready — " if compatible else ""
             self.disk_combo.addItem(
-                f"{disk.physical_name} — {disk.manufacturer} {disk.model} — {human_size(disk.capacity)} — {mounts}"
+                f"{prefix}{disk.physical_name} — {disk.manufacturer} {disk.model} — "
+                f"{human_size(disk.capacity)} — {mounts}"
             )
+        self.disk_combo.blockSignals(False)
         if not disks:
             self.disk_details.setText(
                 "No USB HDD/SSD was detected. Connect one and select Refresh."
@@ -256,10 +285,34 @@ class MainWindow(QMainWindow):
     def _show_disk(self) -> None:
         index = self.disk_combo.currentIndex()
         if index < 0 or index >= len(self.disks):
+            self.ready_drive_banner.setVisible(False)
+            self.reformat_checkbox.setChecked(False)
+            self.reformat_checkbox.setEnabled(False)
             self.prepare_button.setEnabled(False)
             return
         disk = self.disks[index]
+        previous_disk = self.selected_disk
+        if previous_disk is not None and (
+            previous_disk.number != disk.number
+            or previous_disk.identity_tuple() != disk.identity_tuple()
+        ):
+            self.opl_root = None
+            self.disc = None
+            self._set_optical_enabled(False)
+            self.disc_details.setText("Select and prepare this destination drive first.")
         self.selected_disk = disk
+        compatible, reasons = validate_opl_compatibility(disk)
+        self.ready_drive_banner.setVisible(compatible)
+        self.reformat_checkbox.setChecked(False)
+        self.reformat_checkbox.setEnabled(disk.destructive_access_allowed)
+        if disk.safety_reasons:
+            self.reformat_checkbox.setToolTip(
+                "Reformatting is blocked because this physical device has a protected role."
+            )
+        else:
+            self.reformat_checkbox.setToolTip(
+                "Optional. Leave unchecked to preserve every existing game and file."
+            )
         volumes = (
             "; ".join(
                 f"{', '.join(volume.mount_points) or volume.guid_path} — {volume.filesystem or 'Unknown'}"
@@ -277,8 +330,33 @@ class MainWindow(QMainWindow):
             f"Serial: {disk.serial or 'Unavailable'}<br>Capacity: {human_size(disk.capacity)} "
             f"({disk.capacity:,} bytes)<br>Bus: {disk.bus_type}<br>Device class: "
             f"{'Removable' if disk.removable else 'Fixed'}<br>Partition table: "
-            f"{disk.partition_style.name}<br>Volumes: {volumes}{safety}"
+            f"{disk.partition_style.name}<br>Volumes: {volumes}"
+            + (
+                "<br>Status: <b>Ready for OPL; existing games and folders will be preserved.</b>"
+                if compatible
+                else "<br>OPL compatibility: " + " ".join(reasons)
+            )
+            + safety
         )
+        self._update_drive_action()
+
+    def _update_drive_action(self) -> None:
+        index = self.disk_combo.currentIndex()
+        if index < 0 or index >= len(self.disks):
+            self.prepare_button.setText("Validate selected drive")
+            self.prepare_button.setEnabled(False)
+            return
+        disk = self.disks[index]
+        compatible, _reasons = validate_opl_compatibility(disk)
+        reformat = self.reformat_checkbox.isChecked()
+        self.reformat_checkbox.setEnabled(not self.busy and disk.destructive_access_allowed)
+        if compatible and not reformat:
+            text = "Use Existing PS2 Drive"
+        elif reformat:
+            text = "Reformat Selected Drive" if compatible else "Initialize Drive for OPL"
+        else:
+            text = "Review Drive Requirements"
+        self.prepare_button.setText(text)
         self.prepare_button.setEnabled(not self.busy)
 
     def prepare_selected_disk(self) -> None:
@@ -286,7 +364,8 @@ class MainWindow(QMainWindow):
             return
         disk = self.selected_disk
         compatible, reasons = validate_opl_compatibility(disk)
-        if compatible:
+        reformat_requested = self.reformat_checkbox.isChecked()
+        if compatible and not reformat_requested:
             mount = next((point for volume in disk.volumes for point in volume.mount_points), None)
             if not mount:
                 QMessageBox.critical(
@@ -308,24 +387,40 @@ class MainWindow(QMainWindow):
                 disk.capacity,
             )
             self.progress_label.setText(
-                "Drive is already OPL-compatible. No formatting is required."
+                "Existing PS2-ready drive selected. No formatting was performed; existing "
+                "games and files were preserved."
             )
             self.refresh_optical()
             return
         reason_text = "\n".join(f"• {reason}" for reason in reasons)
+        if not reformat_requested:
+            QMessageBox.information(
+                self,
+                "Drive is not OPL-compatible",
+                f"{reason_text}\n\nThe drive has not been changed. To initialize it as MBR/exFAT, "
+                "select 'Reformat selected drive before use' and review the destructive "
+                "confirmation details.",
+            )
+            return
         if disk.safety_reasons:
             QMessageBox.critical(
                 self,
                 "Initialization blocked",
-                f"The drive is incompatible:\n{reason_text}\n\nDestructive access is blocked:\n"
+                (f"The drive is incompatible:\n{reason_text}\n\n" if reasons else "")
+                + "Destructive access is blocked:\n"
                 + "\n".join(f"• {reason}" for reason in disk.safety_reasons),
             )
             return
         response = QMessageBox.warning(
             self,
-            "Drive is not OPL-compatible",
-            f"{reason_text}\n\nInitialize this physical drive as one MBR/exFAT partition? "
-            "All existing partitions and files will be erased.",
+            "Confirm drive reformat",
+            (
+                "This drive is already PS2-ready, but reformatting was explicitly selected."
+                if compatible
+                else f"The drive is incompatible:\n{reason_text}"
+            )
+            + "\n\nReformat this physical drive as one MBR/exFAT partition? "
+            "All existing games, partitions, and files will be erased.",
             QMessageBox.Yes | QMessageBox.Cancel,
             QMessageBox.Cancel,
         )
@@ -366,6 +461,8 @@ class MainWindow(QMainWindow):
             return
         self.opl_root = Path(mount)
         OPLDrive(self.opl_root).create_directories()
+        self.reformat_checkbox.setChecked(False)
+        self.ready_drive_banner.setVisible(True)
         self.progress_label.setText(
             "USB drive initialized and verified as MBR / exFAT / OPL ready."
         )
